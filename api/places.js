@@ -1,4 +1,4 @@
-const places = require('./places.json');
+const places = require('../data/places.json');
 
 module.exports = (req, res) => {
   res.setHeader('Cache-Control', 's-maxage=3600');
