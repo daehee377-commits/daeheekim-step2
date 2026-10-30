@@ -1,4 +1,4 @@
-const bundled = require('../data/places.json');
+import bundled from '../data/places.json' with { type: 'json' };
 
 const INFO_KEY = process.env.JEJU_CULTURE_INFO_KEY;
 const LOCATION_KEY = process.env.JEJU_CULTURE_LOCATION_KEY;
@@ -36,7 +36,7 @@ function merge(info, loc) {
   });
 }
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   let places = bundled, source = 'bundled';
   if (keyOk(INFO_KEY) && keyOk(LOCATION_KEY) && INFO_URL && LOCATION_URL) {
     try {
@@ -49,4 +49,4 @@ module.exports = async (req, res) => {
   }
   res.setHeader('Cache-Control', 's-maxage=3600');
   res.status(200).json({ source, count: places.length, places });
-};
+}
