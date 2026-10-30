@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>제주 역사문화 퀴즈 투어</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#f6f4ee;--card:#fff;--ink:#1d2b2a;--sub:#6b7a78;--line:#e2dfd4;--acc:#0f766e;--acc2:#e07a2f}
+@media (prefers-color-scheme:dark){:root{--bg:#14201f;--card:#1d2d2c;--ink:#e8efee;--sub:#9db0ad;--line:#2f4442;--acc:#4fd1c5;--acc2:#f6ad6b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;line-height:1.5}
+header{padding:24px 20px 10px;max-width:1200px;margin:0 auto}
+h1{margin:0;font-size:26px}
+header p{margin:4px 0 0;color:var(--sub);font-size:14px}
+main{max-width:1200px;margin:0 auto;padding:0 20px 40px;display:grid;grid-template-columns:1.25fr 1fr;gap:16px}
+@media (max-width:860px){main{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+.panel h2{margin:0 0 8px;font-size:16px}
+#map{height:480px;border-radius:10px;z-index:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input[type=search]{flex:1 1 200px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+.chip,.btn{border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:5px 11px;border-radius:999px;cursor:pointer;font:inherit;font-size:13px}
+.chip.on,.btn.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.btn.warn.on{background:var(--acc2);border-color:var(--acc2)}
+.sub{color:var(--sub);font-size:13px}
+#list{max-height:430px;overflow:auto;display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.item{padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--bg);display:flex;gap:8px;align-items:center}
+.item .t{flex:1;min-width:0;cursor:pointer}
+.item b{display:block}
+.tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:var(--acc);color:#fff;margin-right:4px}
+#course{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+#course li{display:flex;gap:6px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+#course li.done{border-color:var(--acc2)}
+#course .n{width:24px;height:24px;border-radius:50%;background:var(--acc2);color:#fff;text-align:center;font-size:13px;line-height:24px;flex:none}
+#course .nm{flex:1;min-width:0;cursor:pointer}
+.bar{height:8px;background:var(--bg);border-radius:99px;overflow:hidden;margin:8px 0 4px;border:1px solid var(--line)}
+.bar i{display:block;height:100%;background:var(--acc2);width:0;transition:width .3s}
+.pin{width:26px;height:26px;background:var(--acc);border:2px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 1px 4px #0006}
+.pin span{display:block;transform:rotate(45deg);color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:22px}
+.pin.in{background:var(--acc2)}
+.pin.st{background:#7c3aed}
+.pop{max-width:260px}
+.pop h3{margin:0 0 4px;font-size:15px}
+.pop .tx{max-height:120px;overflow:auto;font-size:12px;margin:6px 0;white-space:pre-wrap}
+.pop .bt{display:flex;gap:6px;flex-wrap:wrap}
+.pop a{font-size:12px}
+.quiz{margin:10px 0;padding:14px;border:2px solid var(--acc2);border-radius:12px;background:var(--bg)}
+.quiz[hidden]{display:none}
+.quiz h3{margin:0 0 4px;font-size:15px}
+.quiz .q{font-weight:700;margin:6px 0 10px}
+.quiz .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:600px){.quiz .opts{grid-template-columns:1fr}}
+.quiz .opts .btn{border-radius:10px;padding:9px 12px;text-align:left}
+.quiz .opts .btn[disabled]{opacity:.45;text-decoration:line-through;cursor:default}
+.quiz .fb{margin-top:10px;font-size:14px}
+.quiz .ok{color:var(--acc);font-weight:700}
+.quiz .no{color:var(--acc2)}
+.warnbox{padding:14px;color:var(--acc2)}
+</style>
+</head>
+<body>
+<header>
+  <h1>제주 역사문화 퀴즈 투어</h1>
+  <p>마음에 드는 곳을 찜 → 나만의 답사 코스로 연결 → 장소 퀴즈를 맞히면 도장 찍기 (제주특별자치도 제주역사문화 데이터, 기준일 2022-12-09)</p>
+</header>
+<main>
+  <section class="panel">
+    <div id="map"></div>
+    <p class="sub" id="mapmsg">지도는 인터넷에 연결되어 있어야 보입니다.</p>
+  </section>
+
+  <section class="panel">
+    <h2>장소 찾기 <span class="sub" id="count"></span></h2>
+    <div class="row"><input id="q" type="search" placeholder="장소명, 주소, 내용으로 검색"></div>
+    <div class="row" id="chips" style="margin-top:8px"></div>
+    <div id="list"></div>
+  </section>
+
+  <section class="panel" style="grid-column:1/-1">
+    <h2>나의 답사 코스 · 퀴즈 스탬프</h2>
+    <div class="sub" id="cinfo"></div>
+    <div class="bar"><i id="prog"></i></div>
+    <div class="sub" id="ptext"></div>
+    <div id="quiz" class="quiz" hidden></div>
+    <ol id="course"></ol>
+    <div class="row" style="margin-top:10px"><button class="btn" data-act="clear">코스 비우기</button><button class="btn" data-act="clearstamp">도장 초기화</button></div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let DATA = [];
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+let course = load("jeju_course", []);
+let stamps = new Set(load("jeju_stamps", []));
+let cat = "전체";
+const markers = new Map(), byId = new Map();
+let map, layer, line;
+
+function mapInit() {
+  if (typeof L === "undefined") {
+    $("#map").innerHTML = '<div class="warnbox">지도를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침 해주세요.</div>';
+    return false;
+  }
+  map = L.map("map").setView([33.38, 126.55], 10);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 18, attribution: "© OpenStreetMap"}).addTo(map);
+  layer = L.layerGroup().addTo(map);
+  line = L.polyline([], {color: "#e07a2f", weight: 4, dashArray: "8 6"}).addTo(map);
+  return true;
+}
+
+function pinIcon(d) {
+  const i = course.indexOf(d.id);
+  const cls = i < 0 ? "pin" : stamps.has(d.id) ? "pin st" : "pin in";
+  return L.divIcon({className: "", html: `<div class="${cls}"><span>${i < 0 ? "" : i + 1}</span></div>`, iconSize: [26, 26], iconAnchor: [13, 26], popupAnchor: [0, -26]});
+}
+
+function popupHtml(d) {
+  const on = course.includes(d.id);
+  return `<div class="pop"><h3>${esc(d.name)}</h3>
+    <span class="tag">${esc(d.category || "기타")}</span><span class="sub">${esc(d.title)}</span>
+    <div class="sub">${esc(d.addr)}</div>
+    <div class="tx">${esc(d.content)}</div>
+    <div class="bt"><button class="btn ${on ? "on" : ""}" data-act="fav" data-id="${d.id}">${on ? "♥ 찜 해제" : "♡ 찜"}</button>
+    <a href="${esc(d.url)}" target="_blank" rel="noopener">원문 보기</a></div></div>`;
+}
+
+function km(a, b) {
+  const R = 6371, r = x => x * Math.PI / 180;
+  const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lng - a.lng) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function filtered() {
+  const q = $("#q").value.trim();
+  return DATA.filter(d => (cat === "전체" || (d.category || "기타") === cat) && (!q || (d.name + d.addr + d.title + d.content).includes(q)));
+}
+
+function refresh(fit) {
+  const shown = filtered(), ids = new Set(shown.map(d => d.id));
+  $("#count").textContent = shown.length + "곳";
+  if (map) {
+    markers.forEach((m, id) => {
+      const d = byId.get(id);
+      m.setIcon(pinIcon(d));
+      if (ids.has(id)) { if (!layer.hasLayer(m)) layer.addLayer(m); }
+      else layer.removeLayer(m);
+      if (m.isPopupOpen()) m.getPopup().setContent(popupHtml(d));
+    });
+    line.setLatLngs(course.map(id => [byId.get(id).lat, byId.get(id).lng]));
+    if (fit && shown.length && shown.length < DATA.length) map.fitBounds(shown.map(d => [d.lat, d.lng]), {padding: [30, 30], maxZoom: 14});
+  }
+  $("#list").innerHTML = shown.map(d => {
+    const on = course.includes(d.id);
+    return `<div class="item"><div class="t" data-act="go" data-id="${d.id}"><b>${esc(d.name)}</b><span class="tag">${esc(d.category || "기타")}</span><span class="sub">${esc(d.addr.replace("제주특별자치도 ", ""))}</span></div>
+      <button class="btn ${on ? "on" : ""}" data-act="fav" data-id="${d.id}">${on ? "♥ 찜" : "♡ 찜"}</button></div>`;
+  }).join("") || '<p class="sub">검색 결과가 없습니다.</p>';
+  renderCourse();
+}
+
+function renderCourse() {
+  let dist = 0;
+  for (let i = 1; i < course.length; i++) dist += km(byId.get(course[i - 1]), byId.get(course[i]));
+  const done = course.filter(id => stamps.has(id)).length;
+  $("#cinfo").textContent = course.length ? `${course.length}곳 · 순서대로 이동 시 약 ${dist.toFixed(1)}km` : "아직 찜한 곳이 없습니다. 목록이나 지도에서 ♡ 찜을 눌러 보세요.";
+  $("#prog").style.width = course.length ? done / course.length * 100 + "%" : "0";
+  $("#ptext").textContent = course.length ? (done === course.length ? "🎉 코스 완주! 모든 도장을 모았어요." : `도장 ${done} / ${course.length}`) : "";
+  $("#course").innerHTML = course.map((id, i) => {
+    const d = byId.get(id), s = stamps.has(id);
+    return `<li class="${s ? "done" : ""}"><span class="n">${i + 1}</span><span class="nm" data-act="go" data-id="${id}"><b>${esc(d.name)}</b> <span class="sub">${esc(d.addr.replace("제주특별자치도 ", ""))}</span></span>
+      <button class="btn" data-act="up" data-id="${id}" ${i === 0 ? "disabled" : ""}>▲</button>
+      <button class="btn" data-act="down" data-id="${id}" ${i === course.length - 1 ? "disabled" : ""}>▼</button>
+      <button class="btn warn ${s ? "on" : ""}" data-act="quiz" data-id="${id}">${s ? "도장 ✔" : "퀴즈 풀기"}</button>
+      <button class="btn" data-act="fav" data-id="${id}">✕</button></li>`;
+  }).join("");
+}
+
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const dongOf = d => (d.addr.split(" ")[2] || "").replace(/\d.*$/, "");
+const cityOf = d => d.addr.includes("서귀포시") ? "서귀포시" : "제주시";
+let cur = null;
+
+function makeQuiz(d) {
+  const short = d.addr.replace("제주특별자치도 ", "");
+  const dong = dongOf(d);
+  if (d.id % 2 === 1 && dong) {
+    const others = shuffle([...new Set(DATA.map(dongOf).filter(x => x && x !== dong))]).slice(0, 3);
+    return {id: d.id, q: `"${d.name}"은(는) 어느 동네(읍·면·동)에 있을까요?`, opts: shuffle([dong, ...others]), ans: dong, hint: `힌트: ${cityOf(d)}에 있어요.`};
+  }
+  const others = shuffle(DATA.filter(x => x.id !== d.id && x.title !== d.title)).slice(0, 3);
+  return {id: d.id, q: `"${d.title}" 자료는 어느 장소에 관한 이야기일까요?`, opts: shuffle([d.name, ...others.map(x => x.name)]), ans: d.name, hint: `힌트: 분류는 "${d.category || "기타"}", 위치는 ${short.split(" ").slice(0, 2).join(" ")} 쪽이에요.`};
+}
+
+function showQuiz(id) {
+  const d = byId.get(id);
+  cur = makeQuiz(d);
+  const box = $("#quiz");
+  box.hidden = false;
+  box.innerHTML = `<h3>📜 ${esc(d.name)} 퀴즈</h3><div class="q">${esc(cur.q)}</div>
+    <div class="opts">${cur.opts.map((o, i) => `<button class="btn" data-act="ans" data-i="${i}">${esc(o)}</button>`).join("")}</div>
+    <div class="fb" id="fb"></div><div class="row" style="margin-top:8px"><button class="btn" data-act="qclose">닫기</button></div>`;
+  box.scrollIntoView({behavior: "smooth", block: "nearest"});
+}
+
+function answer(i) {
+  const d = byId.get(cur.id), b = document.querySelector(`#quiz [data-i="${i}"]`), fb = $("#fb");
+  if (cur.opts[i] === cur.ans) {
+    stamps.add(cur.id); persist();
+    fb.innerHTML = `<span class="ok">정답! 도장을 찍었어요 🎉</span><div class="sub">${esc(d.content.slice(0, 160))}…</div>`;
+    document.querySelectorAll("#quiz .opts .btn").forEach(x => x.disabled = true);
+    refresh(false);
+  } else {
+    b.disabled = true;
+    fb.innerHTML = `<span class="no">아쉬워요, 다시 골라 보세요. ${esc(cur.hint)}</span>`;
+  }
+}
+
+function persist() { save("jeju_course", course); save("jeju_stamps", [...stamps]); }
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  const id = +b.dataset.id, act = b.dataset.act, i = course.indexOf(id);
+  if (act === "fav") { if (i < 0) course.push(id); else course.splice(i, 1); }
+  else if (act === "quiz") { if (!stamps.has(id)) showQuiz(id); return; }
+  else if (act === "ans") { answer(+b.dataset.i); return; }
+  else if (act === "qclose") { $("#quiz").hidden = true; return; }
+  else if (act === "up" && i > 0) { [course[i - 1], course[i]] = [course[i], course[i - 1]]; }
+  else if (act === "down" && i < course.length - 1) { [course[i + 1], course[i]] = [course[i], course[i + 1]]; }
+  else if (act === "clear") { course = []; }
+  else if (act === "clearstamp") { stamps.clear(); }
+  else if (act === "go") {
+    const d = byId.get(id), m = markers.get(id);
+    if (map && m) { if (!layer.hasLayer(m)) layer.addLayer(m); map.setView([d.lat, d.lng], 14); m.openPopup(); $("#map").scrollIntoView({behavior: "smooth", block: "center"}); }
+    return;
+  } else return;
+  persist();
+  refresh(false);
+});
+
+function boot() {
+  course = course.filter(id => byId.has(id));
+  const cats = ["전체", ...new Set(DATA.map(d => d.category || "기타"))];
+  $("#chips").innerHTML = cats.map(c => `<button class="chip${c === cat ? " on" : ""}" data-c="${esc(c)}">${esc(c)}</button>`).join("");
+  $("#chips").addEventListener("click", e => {
+    if (!e.target.dataset.c) return;
+    cat = e.target.dataset.c;
+    document.querySelectorAll(".chip").forEach(x => x.classList.toggle("on", x.dataset.c === cat));
+    refresh(true);
+  });
+  $("#q").addEventListener("input", () => refresh(true));
+  if (map) DATA.forEach(d => {
+    const m = L.marker([d.lat, d.lng], {icon: pinIcon(d), title: d.name});
+    m.bindPopup(() => popupHtml(d));
+    markers.set(d.id, m);
+  });
+  refresh(false);
+}
+
+function start(data) { DATA = data; DATA.forEach(d => byId.set(d.id, d)); mapInit(); boot(); }
+$("#list").innerHTML = '<p class="sub">불러오는 중...</p>';
+fetch("/api/places")
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(j => start(j.places))
+  .catch(() => { $("#list").innerHTML = '<p class="sub">데이터를 불러오지 못했습니다. 새로고침 해주세요.</p>'; });
+</script>
+</body>
+</html>
